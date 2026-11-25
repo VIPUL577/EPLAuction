@@ -1,0 +1,623 @@
+write a prompt for codex following the instructions below:
+2 sides, admin and common frontend(no login required)
+admin: 
+    5 Admins: 1 master admin others Admins
+    normal Admin:
+        1. Refresh from the database(from the link by master admin)
+        2. update the bids(sequentialize mutiple parallel requests) by a bid updating rule, by the up arrow key
+        3. undo the last bid update 
+        4. they enter which player is sold to which team after the bidding is ended, (end bid button) and single option tick for the teams to which the player is sold, which gets filled automatically to the google sheet link provided by master admin. 
+        5. display the player card 
+    master Admin: 
+        1. every power of normal admin
+        2. a space to paste link for excel sheet having the database of each player arranged in the columns ( 1. sl no. 2. name 3. photo google drive link 4. category 5. base price 6. final team (initialy blank))
+        3. start auction button 
+        4. all the editable stuff can be changed only my master admin, 
+
+single admin login, recogize by username and passwrod the category of admin. 
+the admin before starting the auction at the time of setup should be allowed in the backend to choose the 8 captians - it is to be notes that captian is not a seperate category - he is a nnormal player by category merely named as a captian and the 8 captians are drawn first then the remaining 80 players 
+the base price of the captians is detemined based on the category he is in
+
+logo is there in the contents folder make the theme as per the logo, 
+
+after the auction is started, captains are auctioned first as per the below rules then players are drawn at random, and the bidding 
+starts, the admins manullly puts the bid to display to everyone, and the admins also ends the bidding and assigns the team.  
+
+when a player is drawn at random the folling things are shown to everyone from the sheet
+
+1) sl no.
+2) name
+3) photo ka google drive link
+4) category
+5) base price
+
+this continues till the entire auction is over, 
+
+make a proper well arranged github repo for it. 
+
+not on the big screen but in the phone of the audience should show the players sold , players left , current teams , purse left with the teams and general info around this like player base price ( of the player left ) if a player is sold at what price is he sold 
+
+the most expensive player sold from each category ( and a 12th row o show the most expensive captain sold) 
+
+Squads. Tap any team to see its squad, purse and open slots
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+1. Setup (admin-editable)
+- 8 teams, 11 player categories, 8 players per category (88 players total)
+- Every value below is editable in a Setup page: bid-ladder threshold, both bid steps, and all multipliers
+
+2. Teams (name, colour)
+- Shakuni Strategists #8E5CF5
+- Krishna Crusaders #2D8CFF
+- Yudhisthira Yodhas #F2B705
+- Bhima Bashers #E5484D
+- Pandava Warriors #FF7A1A
+- Abhimanyu Avengers #12B886
+- Arjuna Archers #20C4E8
+- Karna Chargers #E34BA9
+- Each team has a ₹18 Cr budget and must end with exactly 11 players, 1 from each category
+
+3. Categories and base prices (Lakhs)
+- All-rounder 1: 90, All-rounder 2: 80
+- Batsman 1: 70, Batsman 2: 40, Batsman 3: 30
+- Bowler 1: 60, Bowler 2: 50, Bowler 3: 30
+- Impact player 1, 2, 3: 20 each
+
+4. Owners
+- Each team has exactly 2 owners, entered by the admin before the auction
+- Owner fields: name, optional link to a player, optional captain tick
+- An owner can be a player, a player and a captain, or neither
+
+5. Owner-player (pre-auction)
+- If an owner is also a player, auto-assign him to his own team at 3x his category's base price
+
+6. Captains
+- The admin pre-selects 8 captains (ordinary players from any categories, any mix)
+- A captain's base price is his category's base price
+- Captains are auctioned first, in random order, and no non-captain can come up until every team has a captain
+- Each team gets exactly 1 captain
+- The last remaining captain auto-goes to the last team without a captain at 3x base (example: ₹80 L becomes ₹2.4 Cr)
+- A captain fills both the captain slot and his category slot
+
+7. Remaining players
+- After captains, each team buys 10 players, 1 from each category it doesn't hold yet
+- The software generates the player order randomly, any category can appear at any time
+
+8. Bid ladder
+- +10 Lakhs while the current bid is below 200 (₹2 Cr), +20 Lakhs from 200 upward (190, 200, 220, 240)
+- If a base price isn't a multiple of 10, the ladder continues from it (85, 95 ... 195, 205, 225)
+
+9. Validation rules
+- Minimum wallet: after every purchase a team must still hold at least 2x the base price of every category it hasn't filled. Reject any bid that would break this.
+- Category penalty: the 8th (last) player of each category auto-goes to the last remaining team that still needs that category, at 2x base
+- Multipliers (editable): wallet reserve 2x, owner-player 3x, last captain 3x, last player in category 2x
+
+10. Bidding conduct
+- Only 2 teams bid against each other at a time, a 3rd enters only after one withdraws
+- The auctioneer enforces this in the room. The app does not track who is bidding. It only shows this rule on a Rules page.
+
+11. Disputes and audit
+- The auctioneer's decision is final on bids, the Auction Committee's on rules
+- The admin needs a full audit trail of every action to settle disputes
+
+12. Impact Players (reference only)
+- Each team has Impact Players A, B and C. This is a match rule only, no app logic needed.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::TECH STACK:::::::::::
+# Project: EPL Auction Management System
+
+Act as a senior full-stack engineer and AWS solutions architect. Build a complete, production-quality cricket player auction website for a gully cricket tournament.
+
+The application should be simple to operate, visually polished, responsive, real-time and extremely cost-efficient.
+
+**Primary deployment constraint: Use AWS Free Tier eligible resources wherever possible. The expected tournament duration is one month, with approximately 300 simultaneous public viewers and multiple administrators.**
+
+Do not provision AWS resources or incur costs without explicit approval.
+
+---
+
+# 1. TECHNOLOGY STACK
+
+Use the following technologies:
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- CSS3
+- Responsive design using CSS media queries
+- WebSocket client for real-time updates
+
+### Backend
+- Node.js
+- TypeScript
+- AWS Lambda
+- Amazon API Gateway (HTTP API + WebSocket API)
+- Amazon DynamoDB
+- Amazon Cognito for administrator authentication
+
+### Hosting
+- Amazon S3 for frontend hosting
+- Amazon CloudFront for frontend delivery
+- CloudFront-generated URL; no custom domain required.
+
+### Development
+- Git and GitHub
+- VS Code
+- npm
+
+Keep the application modular and maintainable. Avoid unnecessary dependencies and infrastructure.
+
+# 2. USER ROLES
+
+There are two categories of users.
+
+## A. Public viewers
+
+- No registration or login.
+- Anyone with the website link can access the auction.
+- Public viewers have read-only access.
+- They should receive real-time auction updates.
+- They cannot modify any information.
+
+## B. Administrators
+
+- Multiple administrators must be supported.
+- Each administrator has individual login credentials.
+- Use Amazon Cognito for authentication.
+- All authenticated administrators share the same auction state.
+- Any administrator can manage players, teams and bids.
+- Every admin action must be recorded with the administrator's identity and timestamp.
+
+There must be no restriction on multiple administrators accessing the dashboard simultaneously.
+
+# 3. DESKTOP AND MOBILE INTERFACES
+
+Build two distinct viewing experiences within the same React application. 
+
+## Desktop interface
+
+The desktop interface should contain the complete auction dashboard.
+
+Include:
+
+- Admin dashboard.
+- Player management.
+- Team management.
+- Current player auction panel.
+- Current bid and base price.
+- Team-wise budget information.
+- Sold and unsold player lists.
+- Auction statistics.
+- Bid management controls.
+- Auction history.
+
+Administrators should be able to operate the complete auction from a desktop.
+
+## Mobile interface
+
+Mobile devices should display only the public viewer interface.
+
+Display:
+- Player photograph.
+- Player name.
+- Playing role.
+- Base price.
+- Current bid.
+- Current highest-bidding team.
+- Auction status: Upcoming, Live, Sold or Unsold.
+- Purchasing team, if sold.
+
+Mobile viewers must not see administrative controls or the admin dashboard.
+
+Use responsive CSS and media queries.
+
+IMPORTANT:
+Hiding admin controls using CSS is not a security mechanism. All admin operations must be protected by backend authentication and authorization.
+
+The public mobile interface must remain read-only regardless of the device or browser used.
+
+# 4. PLAYER MANAGEMENT
+
+Administrators should be able to:
+
+- Add new players.
+- Edit player information.
+- Delete players.
+- Upload player photographs.
+- Set player base prices.
+- Assign player roles.
+- View all registered players.
+- Mark players as eligible or unavailable for auction.
+
+Player information should include:
+
+- Player ID.
+- Name.
+- Photograph.
+- Age (optional).
+- Playing role.
+- Batting style (optional).
+- Bowling style (optional).
+- Base price.
+- Auction status.
+- Final purchase price, if sold.
+- Purchasing team, if sold.
+
+Use unique player IDs.
+
+# 5. TEAM MANAGEMENT
+
+Administrators should be able to:
+
+- Create teams.
+- Edit team names.
+- Delete teams before the auction begins.
+- Set initial team budgets.
+- View remaining budgets.
+- View the list of purchased players.
+- View total expenditure.
+
+Each team should maintain:
+
+- Team ID.
+- Team name.
+- Initial budget.
+- Remaining budget.
+- Number of players purchased.
+- Purchased player list.
+
+Budget calculations must be handled by the backend.
+
+Never allow a team to exceed its available budget.
+
+# 6. LIVE AUCTION FUNCTIONALITY
+
+This is the most important part of the application.
+
+Implement the following workflow:
+
+### Step 1: Select a player
+
+An administrator selects a player and marks them as the current player being auctioned.
+
+The player's information must immediately appear on every connected viewer's screen.
+
+### Step 2: Start bidding
+
+Display:
+
+- Player photograph.
+- Player name.
+- Playing role.
+- Base price.
+- Current bid.
+- Current highest-bidding team.
+
+### Step 3: Update bids
+
+Administrators can:
+
+- Enter a new bid amount.
+- Select the team making the bid.
+- Submit the bid.
+
+After successful validation and database persistence, the new bid must immediately appear on every connected viewer's screen.
+
+All administrators should also see the updated state immediately.
+
+### Step 4: Complete the auction
+
+Administrators can mark the player as:
+
+- SOLD
+- UNSOLD
+
+If SOLD:
+- Record the final purchase price.
+- Record the purchasing team.
+- Deduct the final price from the team's remaining budget.
+- Add the player to the team's roster.
+- Update the player's status.
+
+If UNSOLD:
+- Mark the player as unsold.
+- Do not deduct any team budget.
+
+### Step 5: Next player
+
+Administrators can select the next player and repeat the auction process.
+
+Maintain a complete history of completed auctions.
+
+# 7. BID VALIDATION AND CONCURRENCY
+
+Multiple administrators may update bids simultaneously.
+
+Implement robust server-side validation.
+
+Requirements:
+
+- Prevent simultaneous updates from silently overwriting each other.
+- Use DynamoDB conditional writes or transactions.
+- Implement auction version numbers or optimistic concurrency control.
+- Reject stale bid updates.
+- Prevent bids below the base price.
+- Prevent a team from exceeding its remaining budget.
+- Prevent a player from being sold more than once.
+- Prevent invalid auction state transitions.
+- Record every successful bid update.
+- Include administrator identity and timestamp in the bid history.
+
+The backend must be the single source of truth.
+
+Do not rely on frontend calculations for financial or auction-related validation.
+
+# 8. REAL-TIME COMMUNICATION
+
+Use Amazon API Gateway WebSocket API.
+
+Requirements:
+
+1. Public viewers establish WebSocket connections.
+2. Authenticated administrators establish WebSocket connections.
+3. Admins submit bid updates through authenticated HTTP endpoints.
+4. Lambda validates each bid.
+5. Lambda persists the updated auction state in DynamoDB.
+6. Only after successful persistence, broadcast the new state to all connected clients.
+7. All viewers and admins receive the updated information.
+8. Newly connected viewers receive the latest auction state immediately.
+9. Handle disconnected clients.
+10. Remove stale WebSocket connection IDs.
+11. Implement automatic reconnection.
+12. Prevent duplicate bid submissions through idempotency mechanisms.
+
+Do not implement continuous polling every second.
+
+Optimize broadcasts to reduce API Gateway message consumption.
+
+# 9. DATABASE DESIGN
+
+Use DynamoDB.
+
+Design suitable tables and access patterns for:
+
+- Players.
+- Teams.
+- Auction state.
+- Bid history.
+- Admin-related information, where necessary.
+- WebSocket connection IDs.
+
+Use appropriate partition keys, sort keys, indexes and conditional writes.
+
+Ensure the data model supports:
+
+- Retrieving all players.
+- Retrieving all teams.
+- Retrieving the current auction state.
+- Retrieving a team's purchased players.
+- Retrieving bid history for a player.
+- Retrieving completed auction results.
+
+Avoid unnecessary database scans.
+
+Prefer efficient Query operations and appropriate indexes.
+
+Use transactions when multiple records must be updated atomically, especially when marking a player SOLD and updating the team's budget.
+
+# 10. UI/UX DESIGN
+
+Build a professional sports-auction interface.
+
+Visual direction:
+
+- Dark theme.
+- Modern sports tournament aesthetic.
+- Clean typography.
+- High-contrast bid amounts.
+- Large player photographs.
+- Green for SOLD and successful operations.
+- Red for UNSOLD.
+- Clear team budget indicators.
+- Responsive player cards.
+- Minimal unnecessary animations.
+
+### Desktop
+
+Prioritize operational efficiency.
+
+Administrators should be able to update bids quickly without navigating through unnecessary screens.
+
+### Mobile
+
+Prioritize simplicity.
+
+The current player's photograph, name, role, current bid and auction status should be immediately visible.
+
+The interface should work on Android and iOS browsers.
+
+# 11. AWS FREE TIER COST CONSTRAINTS
+
+The deployment must prioritize AWS Free Tier eligibility and minimal operating costs.
+
+Expected workload:
+- Approximately 300 concurrent public viewers.
+- Multiple simultaneous administrators.
+- One-month tournament.
+- Real-time bid broadcasting.
+- Read-heavy workload with relatively infrequent bid updates.
+
+Use:
+
+- S3 for static frontend files.
+- CloudFront for frontend delivery.
+- Lambda for backend execution.
+- API Gateway HTTP API for backend requests.
+- API Gateway WebSocket API for real-time updates.
+- DynamoDB for application data.
+- Cognito for admin authentication.
+
+Avoid unnecessary infrastructure.
+
+Do NOT use:
+- EC2 instances.
+- RDS.
+- NAT Gateways.
+- Elastic Load Balancers.
+- ElastiCache.
+- Always-running backend servers.
+- Paid third-party messaging services.
+
+Important cost requirements:
+
+1. Check the current Free Tier eligibility and pricing of every AWS service.
+2. Do not assume every resource is free.
+3. Distinguish between Free Tier allowances, promotional credits and normal paid usage.
+4. Optimize WebSocket connection duration and message counts.
+5. Compress player photographs.
+6. Avoid unnecessary Lambda invocations.
+7. Avoid unnecessary DynamoDB reads and writes.
+8. Set up AWS Budgets and billing alerts where available.
+9. Explain potential charges before creating resources.
+10. Never automatically upgrade an AWS Free account to a paid plan.
+11. Do not provision resources without explicit user approval.
+
+Aim to keep the one-month tournament deployment within available AWS Free Tier allowances and credits.
+
+Do not guarantee zero cost without calculating actual expected usage.
+
+# 12. SECURITY
+
+Implement:
+
+- Amazon Cognito authentication for admins.
+- Backend authorization for every administrative operation.
+- IAM least-privilege policies.
+- Server-side input validation.
+- Secure handling of secrets.
+- No AWS credentials in frontend code.
+- Public read-only endpoints.
+- Protected admin endpoints.
+- Audit logs for administrator actions.
+
+Public viewers must never be able to modify auction information.
+
+# 13. ERROR HANDLING AND RELIABILITY
+
+Implement:
+
+- API error handling.
+- WebSocket reconnection.
+- Stale connection cleanup.
+- Input validation.
+- Duplicate request prevention.
+- Database consistency checks.
+- Appropriate logging.
+- Loading states.
+- Error messages.
+- Connection status indicators.
+
+If a viewer temporarily disconnects, they must receive the latest auction state when they reconnect.
+
+# 14. TESTING
+
+Test the following scenarios:
+
+1. Multiple viewers opening the website simultaneously.
+2. Approximately 300 concurrent public WebSocket connections.
+3. Multiple administrators logged in simultaneously.
+4. One administrator updating a bid while others are viewing.
+5. Two administrators submitting bids at nearly the same time.
+6. Invalid bid amounts.
+7. Insufficient team budget.
+8. Player being marked SOLD.
+9. Player being marked UNSOLD.
+10. Duplicate sale prevention.
+11. WebSocket disconnection and reconnection.
+12. Mobile-only public viewer experience.
+13. Unauthorized attempts to access admin APIs.
+
+Do not claim that the application supports 300 concurrent viewers until appropriate load testing has been performed.
+
+# 15. IMPLEMENTATION PLAN
+
+Develop the application in phases.
+
+### Phase 1: Architecture and project setup
+- Propose the complete project directory structure.
+- Design the DynamoDB schema.
+- Design the HTTP API endpoints.
+- Design the WebSocket message protocol.
+- Explain the AWS architecture.
+- Estimate resource usage and potential costs.
+
+### Phase 2: Frontend
+- Build the desktop dashboard.
+- Build the mobile public viewer.
+- Create reusable components.
+- Implement responsive layouts.
+- Use mock data initially.
+
+### Phase 3: Backend
+- Implement Lambda handlers.
+- Implement DynamoDB access.
+- Implement player and team management.
+- Implement auction management.
+- Implement bid validation.
+
+### Phase 4: Authentication
+- Integrate Cognito.
+- Implement multiple administrator accounts.
+- Protect administrative endpoints.
+
+### Phase 5: Real-time communication
+- Integrate API Gateway WebSockets.
+- Implement broadcasting.
+- Implement connection management.
+- Test synchronization across clients.
+
+### Phase 6: Testing
+- Test auction workflows.
+- Test concurrent admin operations.
+- Test mobile and desktop interfaces.
+- Perform load testing.
+
+### Phase 7: AWS deployment
+- Prepare AWS infrastructure configuration.
+- Explain each resource and its pricing.
+- Obtain approval before provisioning.
+- Deploy the frontend and backend.
+- Configure CloudFront.
+- Verify the deployed application.
+
+# 16. DEVELOPMENT RULES
+
+- Use clean, modular TypeScript.
+- Keep frontend and backend code separate.
+- Use reusable React components.
+- Avoid unnecessary abstractions.
+- Do not hardcode tournament data.
+- Use environment variables for configuration.
+- Include sample seed data.
+- Include a detailed README.
+- Include local development instructions.
+- Include AWS deployment instructions.
+- Include tests for critical business logic.
+- Do not implement features that are not requested without explaining why.
+
+Do not attempt to generate the entire application in one step.
+
+Start by presenting:
+
+1. Proposed project directory structure.
+2. System architecture.
+3. DynamoDB data model.
+4. HTTP API endpoint design.
+5. WebSocket event/message design.
+6. AWS resource list with Free Tier eligibility and potential costs.
+
+Wait for approval before beginning implementation.
+
+The final objective is a reliable, low-cost, real-time cricket auction platform that can be operated by multiple administrators on desktop while approximately 300 spectators watch the auction from desktop or mobile devices.

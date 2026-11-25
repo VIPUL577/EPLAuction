@@ -1,0 +1,5 @@
+{
+  "apiBase": "/api",
+  "wsUrl": "ws://localhost:8787/ws",
+  "cognito": null
+}

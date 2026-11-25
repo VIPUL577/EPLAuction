@@ -1,0 +1,381 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  EPL Auction - serverless, Free-Tier-oriented stack: S3 + CloudFront (default *.cloudfront.net URL),
+  API Gateway HTTP + WebSocket APIs, Lambda (Node.js 22, arm64), DynamoDB (provisioned), Cognito.
+  No EC2, RDS, NAT gateways, load balancers or always-on servers.
+
+Parameters:
+  ReadCapacity:
+    Type: Number
+    Default: 20
+    Description: DynamoDB provisioned RCUs (Free Tier covers 25 RCU in total per region).
+  WriteCapacity:
+    Type: Number
+    Default: 20
+    Description: DynamoDB provisioned WCUs (Free Tier covers 25 WCU in total per region).
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: Optional email for an AWS Budgets alert (budgets are free). Leave empty to skip.
+  BudgetUsd:
+    Type: Number
+    Default: 1
+    Description: Monthly budget in USD that triggers the alert email.
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 15
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref AuctionTable
+
+Resources:
+  # ------------------------------------------------------------------ data
+  AuctionTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacity
+        WriteCapacityUnits: !Ref WriteCapacity
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # ------------------------------------------------------------------ auth
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ${AWS::StackName}-admins
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true # no public sign-up
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: false
+          RequireUppercase: false
+          RequireNumbers: true
+          RequireSymbols: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - { Name: admin_only, Priority: 1 }
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: web
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      IdTokenValidity: 12
+      AccessTokenValidity: 12
+      RefreshTokenValidity: 30
+      TokenValidityUnits: { IdToken: hours, AccessToken: hours, RefreshToken: days }
+
+  MasterGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { GroupName: master, UserPoolId: !Ref UserPool, Description: Master admin (setup + everything) }
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { GroupName: admin, UserPoolId: !Ref UserPool, Description: Auction admin (bids, sales) }
+
+  # ------------------------------------------------------------------ HTTP API
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience: [!Ref UserPoolClient]
+
+  HttpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/dist/http
+      Handler: index.handler
+      LoggingConfig:
+        LogGroup: !Ref HttpLogGroup
+      Environment:
+        Variables:
+          WS_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref AuctionTable }
+        - Statement:
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+      Events:
+        Public:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/public/{proxy+}
+            Method: GET
+            Auth: { Authorizer: NONE }
+        Admin:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/admin/{proxy+}
+            Method: ANY
+            Auth: { Authorizer: CognitoAuthorizer }
+
+  HttpLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-http
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------ WebSocket API
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}-ws
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+
+  WsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/dist/ws
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 5
+      LoggingConfig:
+        LogGroup: !Ref WsLogGroup
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref AuctionTable }
+
+  WsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-ws
+      RetentionInDays: 14
+
+  WsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsFunction.Arn}/invocations
+
+  WsConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref WebSocketApi, RouteKey: $connect, Target: !Sub integrations/${WsIntegration} }
+  WsDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref WebSocketApi, RouteKey: $disconnect, Target: !Sub integrations/${WsIntegration} }
+  WsDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref WebSocketApi, RouteKey: $default, Target: !Sub integrations/${WsIntegration} }
+
+  WsDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn: [WsConnectRoute, WsDisconnectRoute, WsDefaultRoute]
+    Properties: { ApiId: !Ref WebSocketApi }
+
+  WsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: prod
+      DeploymentId: !Ref WsDeployment
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 500
+        ThrottlingRateLimit: 100
+
+  WsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  # ------------------------------------------------------------------ static site + CDN
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  # Single-page-app routing without breaking API error codes: /admin, /teams ... -> /index.html
+  SpaRewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-spa-rewrite
+      AutoPublish: true
+      FunctionConfig: { Comment: SPA rewrite, Runtime: cloudfront-js-2.0 }
+      FunctionCode: |
+        function handler(event) {
+          var r = event.request;
+          if (r.uri.indexOf('.') === -1) { r.uri = '/index.html'; }
+          return r;
+        }
+
+  # Public snapshot: cached at the edge, honouring the Lambda's Cache-Control (2 s, or 300 s when pinned to ?rv=).
+  PublicApiCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${AWS::StackName}-public-api
+        MinTTL: 0
+        DefaultTTL: 2
+        MaxTTL: 300
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig: { CookieBehavior: none }
+          HeadersConfig: { HeaderBehavior: none }
+          QueryStringsConfig: { QueryStringBehavior: whitelist, QueryStrings: [rv] }
+
+  # Admin API: Authorization must reach API Gateway; responses are no-store so nothing is cached.
+  AdminApiCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${AWS::StackName}-admin-api
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 1
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: false
+          CookiesConfig: { CookieBehavior: none }
+          HeadersConfig: { HeaderBehavior: whitelist, Headers: [Authorization] }
+          QueryStringsConfig: { QueryStringBehavior: all }
+
+  AdminApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Sub ${AWS::StackName}-admin-api
+        CookiesConfig: { CookieBehavior: none }
+        HeadersConfig: { HeaderBehavior: whitelist, Headers: [Content-Type] }
+        QueryStringsConfig: { QueryStringBehavior: all }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: EPL Auction
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200 # includes India edge locations
+        DefaultRootObject: index.html
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+            S3OriginConfig: { OriginAccessIdentity: '' }
+          - Id: api
+            DomainName: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+            CustomOriginConfig: { OriginProtocolPolicy: https-only, OriginSSLProtocols: [TLSv1.2] }
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRewriteFunction.FunctionMetadata.FunctionARN
+        CacheBehaviors:
+          - PathPattern: /api/public/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            Compress: true
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachePolicyId: !Ref PublicApiCachePolicy
+          - PathPattern: /api/admin/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachePolicyId: !Ref AdminApiCachePolicy
+            OriginRequestPolicyId: !Ref AdminApiOriginRequestPolicy
+
+  # ------------------------------------------------------------------ cost guard-rail
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasAlertEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub ${AWS::StackName}-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref BudgetUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+Outputs:
+  SiteUrl:
+    Description: Public auction website (share this link)
+    Value: !Sub https://${Distribution.DomainName}
+  AdminUrl:
+    Value: !Sub https://${Distribution.DomainName}/admin
+  WebSocketUrl:
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+  SiteBucketName:
+    Value: !Ref SiteBucket
+  DistributionId:
+    Value: !Ref Distribution
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  Region:
+    Value: !Ref AWS::Region
+  TableName:
+    Value: !Ref AuctionTable
