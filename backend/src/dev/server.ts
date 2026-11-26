@@ -12,9 +12,9 @@ import { MemoryStore } from '../store/memory.js';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
-// DEV_USERS="master:master123:master,admin1:admin123:admin"
+// Hardcoded logins (override with DEV_USERS="user:pass:role,...")
 const users = new Map<string, { password: string; role: Role }>();
-for (const spec of (process.env.DEV_USERS ?? 'master:master123:master,admin1:admin123:admin,admin2:admin123:admin,admin3:admin123:admin,admin4:admin123:admin').split(',')) {
+for (const spec of (process.env.DEV_USERS ?? 'eashan:unsoldEashan:master,admin1:Pass@7:admin,admin2:Pass@11:admin,admin3:Pass@15:admin,admin4:Pass@19:admin').split(',')) {
   const [u, p, r] = spec.split(':');
   users.set(u, { password: p, role: r === 'master' ? 'master' : 'admin' });
 }
@@ -81,5 +81,5 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   console.log(`EPL Auction dev API on http://localhost:${PORT}  (ws://localhost:${PORT}/ws)`);
-  console.log('Dev logins: master/master123 (master), admin1..admin4/admin123 (admin)');
+  console.log('Dev logins: eashan (master), admin1..admin4 (admin)');
 });

@@ -29,7 +29,7 @@ backend/            Node.js + TypeScript (Lambda handlers, auction engine, tests
   loadtest.mjs      WebSocket load test (N concurrent viewers)
 frontend/           React + TypeScript + Vite (public viewer + admin dashboard)
 infra/template.yaml AWS SAM / CloudFormation: every AWS resource in one stack
-scripts/            deploy-backend.sh, deploy-frontend.sh, create-admin.sh
+scripts/            deploy-backend.sh, deploy-frontend.sh, create-admin.sh, create-all-admins.sh
 docs/               ARCHITECTURE.md, AWS_DEPLOYMENT.md, COSTS.md, google-apps-script.gs
 seed/               players-sample.csv (88 players, ready to paste into Google Sheets)
 content/            original logo
@@ -48,9 +48,9 @@ cd frontend && npm install && npm run dev
 ```
 
 - Public view: http://localhost:5173 (shrink the window below 820px to see the phone layout)
-- Admin: http://localhost:5173/admin. Logins: `master` / `master123` (master), `admin1`…`admin4` / `admin123`.
+- Admin: http://localhost:5173/admin. Logins: `eashan` / `unsoldEashan` (master), `admin1` / `Pass@7`, `admin2` / `Pass@11`, `admin3` / `Pass@15`, `admin4` / `Pass@19`.
 
-Try it out: log in as master, go to **Setup**, tick 8 captains, **Save captains**, **Start auction**. Then on **Auction**: `N` draws a player, `PgUp` (or `↑`) raises the bid one ladder step, `⌫` undoes, `E` ends the bid and lets you tick the team that bought the player. Open a second browser as `admin1` to see live sync and the concurrency protection.
+Try it out: log in as `eashan`, go to **Setup**, tick 8 captains, **Save captains**, **Start auction**. Then on **Auction**: `N` draws a player, `PgUp` (or `↑`) raises the bid one ladder step, `⌫` undoes, `E` ends the bid and lets you tick the team that bought the player. Open a second browser as `admin1` to see live sync and the concurrency protection.
 
 Run the tests with `cd backend && npm test`.
 
@@ -60,7 +60,7 @@ See **[docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md)** for the full step-by-st
 
 ```bash
 ./scripts/deploy-backend.sh --guided                  # creates the stack (once), later just ./scripts/deploy-backend.sh
-./scripts/create-admin.sh master '<password>' master  # + 4 more with group "admin"
+./scripts/create-all-admins.sh                        # eashan (master) + admin1..admin4
 ./scripts/deploy-frontend.sh                          # builds + uploads the site
 ```
 

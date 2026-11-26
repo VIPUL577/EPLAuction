@@ -66,14 +66,18 @@ To redeploy later (after code changes): `./scripts/deploy-backend.sh` (no `--gui
 
 ## 3. Create the 5 admin logins
 
-One master and four admins. Passwords need at least 8 characters including a number.
+One master and four admins, with hardcoded credentials:
+
+| Username | Password | Role |
+|---|---|---|
+| `eashan` | `unsoldEashan` | master |
+| `admin1` | `Pass@7` | admin |
+| `admin2` | `Pass@11` | admin |
+| `admin3` | `Pass@15` | admin |
+| `admin4` | `Pass@19` | admin |
 
 ```bash
-./scripts/create-admin.sh master   'StrongPass#1' master
-./scripts/create-admin.sh admin1   'StrongPass#2' admin
-./scripts/create-admin.sh admin2   'StrongPass#3' admin
-./scripts/create-admin.sh admin3   'StrongPass#4' admin
-./scripts/create-admin.sh admin4   'StrongPass#5' admin
+./scripts/create-all-admins.sh
 ```
 
 The username and password decide the role: users in the `master` group get the Setup tab and the master powers. You can rerun the script to reset a password. Users can also be managed in the console: *Cognito → User pools → epl-auction-admins*.
@@ -91,7 +95,7 @@ This builds the React app, writes `config.json` (WebSocket URL, Cognito client I
 1. Create the sheet. You can import `seed/players-sample.csv` (*File → Import*) to get the right columns, then replace the rows with the real players.
 2. *Share → General access → **Anyone with the link → Viewer***. Do the same for the Drive folder with the player photos.
 3. *Extensions → Apps Script* → paste `docs/google-apps-script.gs` → change `SECRET` → *Deploy → New deployment → Web app* (Execute as **Me**, Who has access **Anyone**) → authorise → copy the `/exec` URL.
-4. Open `https://<SiteUrl>/admin` and log in as master. In **Setup**: paste the sheet link, the Apps Script URL and the secret → **Save settings** → **Import players from sheet**.
+4. Open `https://<SiteUrl>/admin` and log in as `eashan` (master). In **Setup**: paste the sheet link, the Apps Script URL and the secret → **Save settings** → **Import players from sheet**.
 5. In **Teams**: fill in the owners (link owner-players, tick owner-captains). In **Setup**: tick the captains → **Save captains**.
 6. On auction day: **Setup → Start auction**.
 
