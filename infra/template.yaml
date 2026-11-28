@@ -69,7 +69,7 @@ Resources:
           MinimumLength: 6 # hardcoded admin passwords are 6-7 chars (Cognito minimum is 6)
           RequireLowercase: false
           RequireUppercase: false
-          RequireNumbers: true
+          RequireNumbers: false
           RequireSymbols: false
       AccountRecoverySetting:
         RecoveryMechanisms:
@@ -90,10 +90,10 @@ Resources:
 
   MasterGroup:
     Type: AWS::Cognito::UserPoolGroup
-    Properties: { GroupName: master, UserPoolId: !Ref UserPool, Description: Master admin (setup + everything) }
+    Properties: { GroupName: master, UserPoolId: !Ref UserPool, Description: "Master admin (setup + everything)" }
   AdminGroup:
     Type: AWS::Cognito::UserPoolGroup
-    Properties: { GroupName: admin, UserPoolId: !Ref UserPool, Description: Auction admin (bids, sales) }
+    Properties: { GroupName: admin, UserPoolId: !Ref UserPool, Description: "Auction admin (bids, sales)" }
 
   # ------------------------------------------------------------------ HTTP API
   HttpApi:
